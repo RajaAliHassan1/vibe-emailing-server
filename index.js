@@ -17,14 +17,42 @@ app.post('/api/send-otp', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'email required' });
 
   try {
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'invalid-email-format' });
+    }
+
+    // Check if SMTP is configured
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('SMTP credentials not configured');
+      return res.status(500).json({ error: 'smtp-not-configured' });
+    }
+
     const code = generateCode();
     await saveCode(email, code);
     await sendOTP(email, code);
     console.log(`📨  OTP ${code} sent to ${email}`);
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'email-send-failed' });
+    // Log detailed error
+    console.error('Email send failed:', {
+      error: err.message,
+      code: err.code,
+      command: err.command,
+      stack: err.stack
+    });
+
+    // Return specific error based on the type
+    if (err.code === 'EAUTH') {
+      res.status(500).json({ error: 'smtp-auth-failed' });
+    } else if (err.code === 'ESOCKET') {
+      res.status(500).json({ error: 'smtp-connection-failed' });
+    } else {
+      res.status(500).json({ 
+        error: 'email-send-failed',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
   }
 });
 
@@ -45,11 +73,26 @@ app.post('/api/verify-otp', async (req, res) => {
       customToken // Send this token to the client for Firebase sign-in
     });
   } catch (err) {
-    console.error('Firebase token creation failed:', err);
-    res.status(500).json({ error: 'token-creation-failed' });
+    console.error('Firebase token creation failed:', {
+      error: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+    res.status(500).json({ 
+      error: 'token-creation-failed',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
 // ---------------------------------------------------------------
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`🚀  OTP server listening on :${PORT}`)); 
+app.listen(PORT, () => {
+  console.log(`🚀  OTP server listening on :${PORT}`);
+  console.log('Environment:', {
+    nodeEnv: process.env.NODE_ENV,
+    smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS),
+    firebaseConfigured: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    redisConfigured: !!process.env.REDIS_URL
+  });
+}); 
