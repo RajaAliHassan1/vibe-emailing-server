@@ -1,5 +1,7 @@
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 dotenv.config();
 
 let firebaseApp;
@@ -7,36 +9,38 @@ let auth;
 let db;
 
 try {
-  // Check if Firebase credentials are available
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    console.log('⚠️  FIREBASE_SERVICE_ACCOUNT environment variable not found. Firebase features will be disabled.');
+  // Try to load service account from local file first
+  const serviceAccountPath = path.resolve('./serviceAccountKey.json');
+  let serviceAccount;
+
+  if (fs.existsSync(serviceAccountPath)) {
+    console.log('📄 Found local Firebase service account file');
+    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Fallback to environment variable if file doesn't exist
+    console.log('⚠️  Local service account file not found, falling back to environment variable');
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
+    serviceAccount = JSON.parse(
+      serviceAccountString.replace(/\\n/g, '\n')
+    );
   } else {
-    let serviceAccount;
-    try {
-      // Try to parse the service account JSON, handling escaped newlines in private key
-      const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
-      serviceAccount = JSON.parse(
-        serviceAccountString.replace(/\\n/g, '\n')
-      );
-      
-      // Validate required fields
-      if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-        throw new Error('Invalid service account JSON: missing required fields');
-      }
-    } catch (parseError) {
-      console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT:', parseError.message);
-      throw new Error('Invalid service account JSON format');
-    }
-
-    // Initialize Firebase with the service account
-    firebaseApp = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-
-    auth = admin.auth();
-    db = admin.firestore();
-    console.log('✅ Firebase initialized successfully with service account:', serviceAccount.project_id);
+    console.log('⚠️  No Firebase credentials found. Firebase features will be disabled.');
+    throw new Error('No Firebase credentials available');
   }
+
+  // Validate required fields
+  if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+    throw new Error('Invalid service account JSON: missing required fields');
+  }
+
+  // Initialize Firebase with the service account
+  firebaseApp = admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+
+  auth = admin.auth();
+  db = admin.firestore();
+  console.log('✅ Firebase initialized successfully with service account:', serviceAccount.project_id);
 } catch (error) {
   console.error('❌ Firebase initialization failed:', {
     message: error.message,
