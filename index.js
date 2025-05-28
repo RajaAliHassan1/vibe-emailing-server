@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { generateCode, saveCode, verifyCode } from './otpStore.js';
 import { sendOTP } from './mailer.js';
-import { auth } from './firebaseAdmin.js';
+import { createCustomToken, isFirebaseAvailable } from './firebaseAdmin.js';
 
 dotenv.config();
 
@@ -65,21 +65,29 @@ app.post('/api/verify-otp', async (req, res) => {
     const match = await verifyCode(email, code);
     if (!match) return res.status(400).json({ error: 'invalid-or-expired' });
 
-    // Create a custom token for the verified email
-    const customToken = await auth.createCustomToken(email);
-    
+    // Try to create Firebase token if available
+    let customToken;
+    if (isFirebaseAvailable()) {
+      try {
+        customToken = await createCustomToken(email);
+      } catch (error) {
+        console.error('Firebase token creation failed:', error);
+        // Continue without Firebase token
+      }
+    }
+
     return res.json({ 
       verified: true,
-      customToken // Send this token to the client for Firebase sign-in
+      ...(customToken && { customToken }) // Only include if token was created
     });
   } catch (err) {
-    console.error('Firebase token creation failed:', {
+    console.error('Verification failed:', {
       error: err.message,
       code: err.code,
       stack: err.stack
     });
     res.status(500).json({ 
-      error: 'token-creation-failed',
+      error: 'verification-failed',
       details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
@@ -92,7 +100,7 @@ app.listen(PORT, () => {
   console.log('Environment:', {
     nodeEnv: process.env.NODE_ENV,
     smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS),
-    firebaseConfigured: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    firebaseConfigured: isFirebaseAvailable(),
     redisConfigured: !!process.env.REDIS_URL
   });
 }); 
