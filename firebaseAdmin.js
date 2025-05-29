@@ -10,6 +10,7 @@ let db;
 
 try {
   // Try to load service account from local file first
+  // const serviceAccountPath = path.resolve('vibe-19a6b-firebase-adminsdk-fbsvc-b86f3b04ca.json');
   const serviceAccountPath = path.resolve('./serviceAccountKey.json');
   let serviceAccount;
 
@@ -65,7 +66,27 @@ export async function createCustomToken(email) {
     throw new Error('firebase-not-configured');
   }
   try {
-    return await auth.createCustomToken(email);
+    // First try to get existing user
+    let user;
+    try {
+      user = await auth.getUserByEmail(email);
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        // Create new user if doesn't exist
+        user = await auth.createUser({
+          email,
+          emailVerified: true // Since they verified via OTP
+        });
+        console.log('👤 Created new Firebase user:', user.uid);
+      } else {
+        throw error; // Re-throw other errors
+      }
+    }
+
+    // Create token using the user's UID
+    const customToken = await auth.createCustomToken(user.uid);
+    console.log('🔑 Generated custom token for user:', user.uid);
+    return customToken;
   } catch (error) {
     console.error('Firebase token creation failed:', {
       message: error.message,
