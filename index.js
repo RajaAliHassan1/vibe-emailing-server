@@ -321,8 +321,7 @@ app.post('/api/sign-in', async (req, res) => {
   }
 
   try {
-    // Firebase Admin SDK does not support email/password login
-    // So we use Firebase REST API to verify credentials
+    // 1. Verify credentials using Firebase Auth REST API
     const apiKey = process.env.FIREBASE_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: 'missing-firebase-api-key' });
@@ -346,14 +345,35 @@ app.post('/api/sign-in', async (req, res) => {
       return res.status(401).json({ error: data.error?.message || 'invalid-credentials' });
     }
 
+    // 2. Create a custom token using Admin SDK
+    const customToken = await auth.createCustomToken(data.localId);
+
+    // 3. Return the custom token
     return res.json({
-      token: data.idToken,
-      refreshToken: data.refreshToken,
+      token: customToken,
       uid: data.localId
     });
   } catch (error) {
     console.error('Login failed:', error);
     return res.status(500).json({ error: 'login-failed', details: error.message });
+  }
+});
+
+// --- Delete User from Firebase Auth ------------------------------------------
+app.post('/api/delete-user', async (req, res) => {
+  const { uid } = req.body;
+
+  if (!uid) {
+    return res.status(400).json({ error: 'uid-required' });
+  }
+
+  try {
+    await auth.deleteUser(uid);
+    console.log('🗑️ Firebase Auth user deleted:', uid);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error deleting user from Firebase Auth:', error);
+    return res.status(500).json({ error: 'delete-failed', details: error.message });
   }
 });
 
