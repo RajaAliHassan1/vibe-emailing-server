@@ -9,7 +9,15 @@ import { auth } from './firebaseAdmin.js';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// Update CORS configuration
+app.use(cors({
+  origin: '*', // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // --- Check Email Existence --------------------------------------------------
@@ -311,12 +319,20 @@ app.post('/api/update-password', async (req, res) => {
 
 // --- Sign In With Email and Password ----------------------------------------
 app.post('/api/sign-in', async (req, res) => {
+  console.log('[SignIn] Request received:', {
+    body: req.body,
+    headers: req.headers,
+    origin: req.headers.origin
+  });
+
   const { email, password } = req.body;
   if (!email || !password) {
+    console.log('[SignIn] Missing credentials:', { email: !!email, password: !!password });
     return res.status(400).json({ error: 'email & password required' });
   }
 
   if (!isFirebaseAvailable()) {
+    console.log('[SignIn] Firebase not available');
     return res.status(500).json({ error: 'firebase-not-available' });
   }
 
@@ -324,9 +340,11 @@ app.post('/api/sign-in', async (req, res) => {
     // 1. Verify credentials using Firebase Auth REST API
     const apiKey = process.env.FIREBASE_API_KEY;
     if (!apiKey) {
+      console.log('[SignIn] Firebase API key missing');
       return res.status(500).json({ error: 'missing-firebase-api-key' });
     }
 
+    console.log('[SignIn] Attempting Firebase authentication');
     const response = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
       {
@@ -341,21 +359,37 @@ app.post('/api/sign-in', async (req, res) => {
     );
 
     const data = await response.json();
+    console.log('[SignIn] Firebase auth response:', {
+      status: response.status,
+      ok: response.ok,
+      hasError: !!data.error,
+      errorMessage: data.error?.message
+    });
+
     if (!response.ok) {
       return res.status(401).json({ error: data.error?.message || 'invalid-credentials' });
     }
 
     // 2. Create a custom token using Admin SDK
+    console.log('[SignIn] Creating custom token for user:', data.localId);
     const customToken = await auth.createCustomToken(data.localId);
 
     // 3. Return the custom token
+    console.log('[SignIn] Login successful for user:', data.localId);
     return res.json({
       token: customToken,
       uid: data.localId
     });
   } catch (error) {
-    console.error('Login failed:', error);
-    return res.status(500).json({ error: 'login-failed', details: error.message });
+    console.error('[SignIn] Error:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    return res.status(500).json({ 
+      error: 'login-failed', 
+      details: error.message 
+    });
   }
 });
 

@@ -36,4 +36,12 @@ coverage
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# React Native client files
+SignIn.js
+*.jsx
+*.tsx
+*.ts
+*.js.map
+*.ts.map 
