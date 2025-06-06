@@ -1,99 +1,78 @@
-# Vibe OTP Server
+# Vibe Email Server
 
-A production-ready Node/Express server for handling email OTP (One-Time Password) verification with Firebase integration.
+A Node.js server for handling email verification and Firebase authentication.
 
 ## Features
 
-- 🔐 Secure 6-digit OTP generation
-- 📧 Email delivery via SMTP (Gmail)
-- 🔄 Redis-backed storage with in-memory fallback
-- 🔥 Firebase integration for user verification
-- ⚡ Express.js API endpoints
-- 🔒 CORS enabled for cross-origin requests
+- Email verification using OTP
+- Firebase Authentication integration
+- SMTP email sending
+- Redis caching (optional)
 
-## API Endpoints
+## Prerequisites
 
-### 1. Send OTP
-```http
-POST /api/send-otp
-Content-Type: application/json
-
-{
-  "email": "user@example.com"
-}
-```
-
-### 2. Verify OTP
-```http
-POST /api/verify-otp
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "code": "123456"
-}
-```
+- Node.js (v14 or higher)
+- Firebase project with Admin SDK
+- SMTP server (e.g., Gmail)
+- Redis (optional)
 
 ## Setup
 
-1. Clone the repository
+1. Clone the repository:
+```bash
+git clone <your-repo-url>
+cd VibeEmailingServer
+```
+
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create `.env` file with required variables:
-   ```env
-   # SMTP (Gmail)
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=465
-   SMTP_USER=your-gmail@gmail.com
-   SMTP_PASS=your-app-password
+```bash
+npm install
+```
 
-   # Redis (optional)
-   # REDIS_URL=redis://localhost:6379
-   OTP_TTL=600
-
-   # Firebase (optional)
-   # GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json
-
-   # Server
-   PORT=4000
-   ```
+3. Configure environment variables:
+   - Copy `.env.example` to `.env`
+   - Fill in your Firebase and SMTP credentials
+   - For Firebase, you'll need:
+     - Firebase service account JSON
+     - Firebase Web API Key
+   - For SMTP, you'll need:
+     - SMTP host and port
+     - SMTP user and password (app password for Gmail)
 
 4. Start the server:
-   ```bash
-   # Development
-   npm run dev
-
-   # Production
-   npm start
-   ```
+```bash
+npm start
+```
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SMTP_HOST` | SMTP server host | Yes |
-| `SMTP_PORT` | SMTP server port | Yes |
-| `SMTP_USER` | SMTP username (email) | Yes |
-| `SMTP_PASS` | SMTP password/app-password | Yes |
-| `REDIS_URL` | Redis connection URL | No |
-| `OTP_TTL` | OTP expiration time in seconds | No (default: 600) |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Firebase service account path | No |
-| `PORT` | Server port | No (default: 4000) |
+- `SMTP_HOST`: SMTP server host (e.g., smtp.gmail.com)
+- `SMTP_PORT`: SMTP server port (e.g., 465)
+- `SMTP_USER`: SMTP username/email
+- `SMTP_PASS`: SMTP password/app password
+- `FIREBASE_SERVICE_ACCOUNT`: Firebase service account JSON
+- `FIREBASE_API_KEY`: Firebase Web API Key
+- `PORT`: Server port (default: 4000)
+- `NODE_ENV`: Environment (development/production)
+- `REDIS_URL`: Redis connection URL (optional)
+- `OTP_TTL`: OTP expiration time in seconds (default: 600)
 
-## Development
+## API Endpoints
 
-- Uses ES modules
-- Hot reloading with nodemon in development
-- Redis for production, in-memory store for development
+- `POST /api/check-email`: Check if email exists
+- `POST /api/send-otp`: Send OTP to email
+- `POST /api/verify-otp`: Verify OTP and create/update user
+- `POST /api/recreate-user`: Recreate user with password
+- `POST /api/update-password`: Update user password
+- `POST /api/sign-in`: Sign in with email/password
+- `POST /api/delete-user`: Delete user from Firebase
 
-## Security
+## Security Notes
 
-- OTPs expire after 10 minutes
-- Firebase custom tokens for secure authentication
-- Environment variables for sensitive data
-- CORS enabled for specific origins
+- Never commit `.env` file or Firebase service account JSON
+- Use environment variables for sensitive data
+- Keep your Firebase API keys secure
+- Use app passwords for Gmail SMTP
 
 ## License
 
